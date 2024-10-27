@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: build-and-deploy-
+spec:
+  entrypoint: build-deploy
+  templates:
+  - name: build-deploy
+    steps:
+      - - name: build-image
+          template: build-image
+      - - name: push-image
+          template: push-image
+      - - name: deploy-app
+          template: deploy-app
+
+  # Step 1: Build Docker Image
+  - name: build-image
+    container:
+      image: docker:20.10
+      command: ["/bin/sh", "-c"]
+      args: ["docker build -t $DOCKER_REGISTRY/$IMAGE_NAME:$IMAGE_TAG ."]
+      volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+    outputs:
+      parameters:
+        - name: image
+          value: "{{workflow.parameters.docker_registry}}/{{workflow.parameters.image_name}}:{{workflow.parameters.image_tag}}"
+
+  # Step 2: Push Docker Image to Registry
+  - name: push-image
+    container:
+      image: docker:20.10
+      command: ["/bin/sh", "-c"]
+      args: ["docker push $DOCKER_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"]
+      volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+
+  # Step 3: Deploy to Kubernetes
+  - name: deploy-app
+    container:
+      image: bitnami/kubectl:latest
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          kubectl set image deployment/$DEPLOYMENT_NAME \
+          $CONTAINER_NAME=$DOCKER_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+
+  # Docker socket for Docker-in-Docker (DIND) operations
+  volumes:
+    - name: docker-socket
+      hostPath:
+        path: /var/run/docker.sock

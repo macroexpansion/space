@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: space-deployment
+  labels:
+    app: space
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: space
+  template:
+    metadata:
+      labels:
+        app: space
+    spec:
+      containers:
+        - name: space-container
+          image: docker-registry/space-image:latest  # Replace with your Docker image
+          ports:
+            - containerPort: 8000  # Port on which the web app is running inside the container
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /  # Path to check if the app is healthy
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /  # Path to check if the app is ready to serve traffic
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 5
